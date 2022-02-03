@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Upload Data</title>
+    <script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
+    <style>
+        .center {
+            margin: auto;
+            width: 60%;
+            border: 3px solid #27e3dd;
+            padding: 5vw;
+        }
+        
+        label {
+            margin: 15px;
+        }
+        
+        h3 {
+            text-align: left;
+            display: inline;
+        }
+    </style>
+    <script>
+        const Heroku = "https://voters-backend.herokuapp.com/"
+        var assembly = 0
+        var part_list = []
+        var part = {}
+        var voter_list = []
+        $(document).ready(
+            () => {
+                $("#formId").submit(function(e) {
+                    e.preventDefault();
+                    onsubmit_handler();
+                });
+                const url = $("#formId").attr("cities-list-url");
+                $.ajax({
+                    url: url,
+                    success: (data) => {
+                        let select = $('#local_city');
+                        $.each(data, function(k, v) {
+                            select.append('<option value=' + v["id"] + '>' + v["city_name"] + '</option>');
+                        });
+                    }
+                })
+                $.ajax({
+                    url: Heroku + "api/city-list/",
+                    success: (data) => {
+                        let select = $('#heroku_city');
+                        $.each(data, function(k, v) {
+                            select.append('<option value=' + v["id"] + '>' + v["city_name"] + '</option>');
+                        });
+                    }
+                })
+            }
+        );
+
+        function onchange_local_city() {
+            const selected_city = document.getElementById("local_city");
+            const selected_city_id = selected_city.options[selected_city.selectedIndex].value;
+            const url = $("#formId").attr("assemblies-list-url");
+            $.ajax({
+                url: url,
+                data: {
+                    "city_id": selected_city_id
+                },
+                success: (data) => {
+                    let assembly = $("#local_assembly");
+                    let part_number = $("#local_part");
+                    assembly.empty();
+                    part_number.empty();
+                    assembly.append('<option value="0" selected>-चुनें-</option>');
+                    part_number.append('<option value="0" selected>-चुनें-</option>');
+                    $.each(data, function(k, v) {
+                        assembly.append('<option value=' + v["id"] + '>' + v["assembly_name"] + '</option>');
+                    });
+                }
+            })
+        }
+
+        function onchange_local_assembly() {
+            const selected_assembly = document.getElementById("local_assembly");
+            const selected_assembly_id = selected_assembly.options[selected_assembly.selectedIndex].value;
+            const url = $("#formId").attr("part-number-list-url");
+            $.ajax({
+                url: url,
+                data: {
+                    "assembly_id": selected_assembly_id
+                },
+                success: (data) => {
+                    part_list = data
+                    let part_number = $("#local_part");
+                    part_number.empty();
+                    part_number.append('<option value="0" selected>-चुनें-</option>');
+                    $.each(data, function(k, v) {
+                        part_number.append('<option value=' + v["id"] + '> Part - ' + v["part_number"] + '</option>');
+                    });
+                }
+            })
+        }
+
+        function onchange_local_part() {
+            const selected_part = document.getElementById("local_part");
+            const selected_part_id = selected_part.options[selected_part.selectedIndex].value;
+            part = part_list.find(item => item["id"] == selected_part_id)
+            const url = $("#formId").attr("voter-list-url");
+            $.ajax({
+                url: url,
+                data: {
+                    "part": part.id
+                },
+                success: data => {
+                    voter_list = data
+                }
+            });
+        }
+
+        function onchange_heroku_city() {
+            const selected_part = document.getElementById("heroku_city");
+            const selected_part_id = selected_part.options[selected_part.selectedIndex].value;
+            $.ajax({
+                url: `${Heroku}api/assembly-list/for-city-${selected_part_id}/`,
+                success: data => {
+                    let heroku_assembly = $("#heruku_assembly");
+                    heroku_assembly.empty();
+                    heroku_assembly.append('<option value="0" selected>-चुनें-</option>');
+                    $.each(data, function(k, v) {
+                        heroku_assembly.append('<option value=' + v["id"] + '>' + v["assembly_name"] + '</option>');
+                    });
+                }
+            })
+        }
+
+        function onchange_heroku_assembly() {
+            const selected_part = document.getElementById("heroku_city");
+            const selected_part_id = selected_part.options[selected_part.selectedIndex].value;
+            assembly = selected_part_id
+        }
+
+        function onsubmit_handler() {
+            let logs = $("#logs")
+            logs.html("Sent post request to Heroku... waiting for response")
+            let url = Heroku + "api/receive-data/"
+            data = {
+                "assembly": assembly,
+                "part": part,
+                "voter_list": voter_list
+            }
+            $.ajax({
+                url: url,
+                type: 'POST',
+                dataType: "json",
+                contentType: "application/json; charset=utf-8",
+                data: JSON.stringify(data),
+                success: data => {
+                    logs.html(data)
+                },
+                error: e => {
+                    logs.html(str(e))
+                }
+            })
+        }
+    </script>
+</head>
+
+<body>
+    <p><a style="float: right;" href="{% url 'logout' %}">logout</a></p>
+    <br>
+    <div class="center">
+        <p align="right"><a href="{% url 'load-data' %}">Upload Pdf</a> | <a href="{% url 'main-page' %}">Return to home</a></p>
+        {% ifequal user_type "admin" %}
+        <form id="formId" align="center" enctype="multipart/form-data" cities-list-url="{% url 'cities-list' %}" assemblies-list-url="{% url 'assemblies-list' %}" part-number-list-url="{% url 'part-number-list' %}" voter-list-url="{% url 'voter-list' %}">
+            {% csrf_token %}
+            <h3>local:</h3>
+            <label for="local_city">जिले का नाम:
+                <select id="local_city" name="local_city" onchange="onchange_local_city();">
+                    <option value="0" selected>-चुनें-</option>
+                </select>
+            </label>
+            <label for="local_assembly">विधानसभा:
+                <select id="local_assembly" name="local_assembly" onchange="onchange_local_assembly();">
+                    <option value="0" selected>-चुनें-</option>
+                </select>
+            </label>
+            <label for="local_part">भाग संख्या:
+                <select id="local_part" name="local_part" onchange="onchange_local_part();">
+                    <option value="0" selected>-चुनें-</option>
+                </select>
+            </label>
+            <br>
+            <br>
+            <h3>heroku:</h3>
+            <label for="heroku_city">जिले का नाम:
+                <select id="heroku_city" name="heroku_city" onchange="onchange_heroku_city();">
+                    <option value="0" selected>-चुनें-</option>
+                </select>
+                <label for="heruku_assembly">विधानसभा:
+                <select id="heruku_assembly" name="heruku_assembly" onchange="onchange_heroku_assembly();">
+                    <option value="0" selected>-चुनें-</option>
+                </select>
+            <button style="margin-left:20px;margin-right:20px;" type="submit">Submit</button>
+           
+        </form>
+        {% else %}
+        <p> {{ user_name }}....Sorry you don't have permission </p>
+        {% endifequal %}
+    </div>
+    <div style="margin: auto; text-align: center;">
+        <p id="logs"></p>
+
+        {% if errors %}
+        <p style="text-align: center; color: red;">{{ errors }}</p>
+
+        {% endif %} {% if msg %}
+        <p style="text-align: center; color: limegreen;">{{ msg }}</p>
+        {% endif %}
+
+
+    </div>
+
+
+</body>
+
+</html>

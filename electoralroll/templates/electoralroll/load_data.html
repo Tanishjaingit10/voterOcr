@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Upload Data</title>
+    <script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
+    <style>
+        .center {
+            margin: auto;
+            width: 60%;
+            border: 3px solid #27e3dd;
+            padding: 20px;
+        }
+        
+        label {
+            margin: 15px;
+        }
+    </style>
+    <script>
+        $(document).ready(
+            () => {
+                var url = $("#formId").attr("cities-list-url");
+                $.ajax({
+                    url: url,
+                    success: (data) => {
+                        var $select = $('#city');
+                        $.each(data, function(k, v) {
+                            $select.append('<option value=' + v["id"] + '>' + v["city_name"] + '</option>');
+                        });
+                    }
+                })
+            }
+        );
+
+        function changed_choose_file() {
+            var file = $("#choose_file")
+            const fileName = file[0].files[0].name.slice(0, -4);
+            if (/^S[0-9]{1,}A[0-9]{1,}P([0-9]{1,})$/.test(fileName)) {
+                document.getElementById("part_number").setAttribute("value", fileName.slice(fileName.search("P") + 1));
+            }
+        }
+
+        function change_assembly_data() {
+            var selected_city = document.getElementById("city");
+            var selected_city_id = selected_city.options[selected_city.selectedIndex].value;
+            var url = $("#formId").attr("assemblies-list-url");
+            $.ajax({
+                url: url,
+                data: {
+                    "city_id": selected_city_id
+                },
+                success: (data) => {
+                    var $select = $("#assembly");
+                    $select.empty();
+                    $.each(data, function(k, v) {
+                        $select.append('<option value=' + v["id"] + '>' + v["assembly_name"] + '</option>');
+                    });
+                }
+            })
+
+        };
+    </script>
+</head>
+
+<body>
+    <p><a style="float: right;" href="{% url 'logout' %}">logout</a></p>
+    <br>
+    <div class="center">
+        <p align='right'>
+            {% ifequal HOST "local" %}
+            <a href="{% url 'heroku' %}">Post local data to Heroku</a> |
+            {% endifequal %}
+            <a href="{% url 'main-page' %}">Return to home</a>
+        </p>
+        {% ifequal user_type "admin" %}
+        <form method="post" id="formId" align="center" enctype="multipart/form-data" cities-list-url="{% url 'cities-list' %}" assemblies-list-url="{% url 'assemblies-list' %}">
+            {% csrf_token %}
+            <label for="city">जिले का नाम:
+                <select id="city" name="city" onchange="change_assembly_data(); ">
+                    <option value="0" selected>-चुनें-</option>
+                </select>
+            </label>
+            <label for="assembly">विधानसभा:
+                <select id="assembly" name="assembly">
+                    <option value="0" selected>-चुनें-</option>
+                </select>
+            </label>
+            <br><br>
+            <input type="file" id="choose_file" name="myfile" onchange="changed_choose_file();" style="width: 200px">
+
+            <label for="part_number">भाग संख्या:
+                <input id="part_number" name="part_number" value="" style="width:40px"/>
+            </label>
+
+            <br>
+            <br>
+            <br>
+            <button type="submit">Upload</button>
+        </form>
+        {% else %}
+        <p> {{ user_name }}....Sorry you don't have permission </p>
+        {% endifequal %}
+    </div>
+    <div style="margin: auto">
+        {% if errors %}
+        <p style="text-align: center; color: red;">{{ errors }}</p>
+
+        {% endif %} {% if msg %}
+        <p style="text-align: center; color: limegreen;">{{ msg }}</p>
+        {% endif %}
+
+
+    </div>
+
+
+</body>
+
+</html>
